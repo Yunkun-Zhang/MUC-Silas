@@ -1,6 +1,11 @@
 from z3 import *
-from silas import DT, RFC
-from typing import List, Set
+from model.silas import DT, RFC
+from typing import List, Set, Sequence
+
+
+def _abs(x):
+    """Return the absolute value of x."""
+    return If(x >= 0, x, -x)
 
 
 def _argmax(lst: List) -> int:
@@ -12,12 +17,14 @@ def _argmax(lst: List) -> int:
     return j
 
 
-def _eq(list1: List, list2: List):
-    """Return a Z3 expr whether list1 == list2."""
-    return [v1 == v2 for v1, v2 in zip(list1, list2)]
+def _eq_bound(lst, rng, tau=None):
+    """Return a Z3 expr whether rng - tau <= lst <= rng + tau."""
+    if tau is None:
+        return [v1 == v2 for v1, v2 in zip(lst, rng)]
+    return [_abs(v1 - v2) <= t for v1, v2, t in zip(lst, rng, tau)]
 
 
-def _sum(lists: List[List[ArithRef]], weights: List[int] = None):
+def _sum_weight(lists: List[List[ArithRef]], weights: List[int] = None):
     """Add up some Real lists with weight."""
     res = [0] * len(lists[0])
     if weights is None:
@@ -28,7 +35,7 @@ def _sum(lists: List[List[ArithRef]], weights: List[int] = None):
     return res
 
 
-def _implies(p: List[BoolRef], x: List[ExprRef]):
+def _implies(p, x):
     """Connect each bool variable to an expression."""
     return [Implies(prop, expr) for prop, expr in zip(p, x)]
 
@@ -53,7 +60,7 @@ class Tree:
                 else:
                     conjuncts.append(x[t.feature[p]] > t.threshold[p])
             # leaf node
-            conjuncts.append(And(_eq(out, list(t.value[rule[-1]]))))
+            conjuncts.extend(_eq_bound(out, list(t.value[rule[-1]])))
             disjunctions.append(And(conjuncts))
         return Or(disjunctions)
 
@@ -64,6 +71,7 @@ class RandomForest:
         self.rfc = rfc
 
     def cnf(self, x: List[ArithRef], y: ArithRef) -> BoolRef:
+        """Return R(x) and output."""
         outs = [
             [Int(f'out_{i}_{j}') for j in range(self.rfc.n_classes_)]
             for i in range(len(self.rfc.trees_))
@@ -71,31 +79,39 @@ class RandomForest:
         trees = [Tree(t).cnf(x, outs[i]) for i, t in enumerate(self.rfc.trees_)]
         # does not consider tree weights cause it will be very slow
         w = [int(t.oob_score * 10000) for t in self.rfc]
-        output = [_argmax(_sum(outs, w)) == y]
+        output = [_argmax(_sum_weight(outs, w)) == y]
         return And(trees + output)
 
 
 class MUC:
     def __init__(self, rfc: RFC) -> None:
+        """Compute MUC based on random forest."""
         self.rf = RandomForest(rfc)
+        self.__n_features = rfc.n_features_
 
-    def muc(self, X: List, y: int) -> Set[int]:
+    def muc(self, X: Sequence, y: int, tau: Sequence[float] = None) -> Set[int]:
         """Get the minimal unsatisfiable core of the random forest.
 
         Args:
             X: Data instance, 1D array.
             y: Ground truth of X.
+            tau: Search scope of each feature.
 
         Returns:
             A set of feature indices, which is the MUC.
         """
-        variables = [Real(f'x_{i}') for i in range(self.rf.rfc.n_features_)]
-        props = [Bool(f'p_{i}') for i in range(self.rf.rfc.n_features_)]
+        assert len(X) == self.__n_features and isinstance(X[0], (int, float)), \
+            f'data instance must be 1D array with size {self.__n_features}'
+        variables = [Real(f'x_{i}') for i in range(self.__n_features)]
+        props = [Bool(f'p_{i}') for i in range(self.__n_features)]
         pred = Int('y')
         s = Solver()
         s.set(':core.minimize', True)
         s.add(self.rf.cnf(variables, pred),
-              *_implies(props, _eq(variables, X)),
+              *_implies(props, _eq_bound(variables, X, tau)),
               pred != y)
         s.check(props)
         return set([int(f'{co}'.split('_')[-1]) for co in s.unsat_core()])
+
+    def predict(self, x: Sequence) -> int:
+        return self.rf.rfc(x)
