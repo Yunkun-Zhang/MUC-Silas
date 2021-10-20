@@ -2,6 +2,7 @@ import random
 import math
 import json
 from model.muc import MUC
+from utils import _parallel, _compute_muc
 from typing import Dict
 
 
@@ -89,12 +90,8 @@ class Shapley:
         except FileNotFoundError:
             if self.verbose:
                 print('Computing MUCs. This may take a while.')
-                iterator = X
-            else:
-                from tqdm import tqdm
-                iterator = tqdm(X, desc='Computing MUCs')
-            for i, x in enumerate(iterator):
-                muc = self.muc.muc(x, y[i])
+            res = _parallel(_compute_muc, list(zip(X, y)), muc=self.muc)
+            for i, muc in enumerate(res):
                 self.cache[i] = {
                     'muc': list(muc),
                     'y': y[i]

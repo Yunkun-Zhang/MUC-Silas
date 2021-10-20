@@ -35,6 +35,10 @@ def _sum_weight(lists: List[List[ArithRef]], weights: List[int] = None):
     return res
 
 
+def _in(x, lst):
+    return Or([x == val for val in lst])
+
+
 def _implies(p, x):
     """Connect each bool variable to an expression."""
     return [Implies(prop, expr) for prop, expr in zip(p, x)]
@@ -55,10 +59,18 @@ class Tree:
             # root and each intermediate node
             for n in rule[1:]:
                 p = t.parent[n]
+                threshold = t.threshold[p]
+                f = t.feature[p]
                 if t.children_left[p] == n:
-                    conjuncts.append(x[t.feature[p]] <= t.threshold[p])
+                    if isinstance(threshold, list):
+                        conjuncts.append(_in(x[f], threshold))
+                    else:
+                        conjuncts.append(x[f] <= threshold)
                 else:
-                    conjuncts.append(x[t.feature[p]] > t.threshold[p])
+                    if isinstance(threshold, list):
+                        conjuncts.append(Not(_in(x[f], threshold)))
+                    else:
+                        conjuncts.append(x[f] > threshold)
             # leaf node
             conjuncts.extend(_eq_bound(out, list(t.value[rule[-1]])))
             disjunctions.append(And(conjuncts))
@@ -77,7 +89,6 @@ class RandomForest:
             for i in range(len(self.rfc.trees_))
         ]
         trees = [Tree(t).cnf(x, outs[i]) for i, t in enumerate(self.rfc.trees_)]
-        # does not consider tree weights cause it will be very slow
         w = [int(t.oob_score * 10000) for t in self.rfc]
         output = [_argmax(_sum_weight(outs, w)) == y]
         return And(trees + output)
@@ -102,15 +113,22 @@ class MUC:
         """
         assert len(X) == self.__n_features and isinstance(X[0], (int, float)), \
             f'data instance must be 1D array with size {self.__n_features}'
-        variables = [Real(f'x_{i}') for i in range(self.__n_features)]
+
+        # create feature variables according to rfc features
+        variables = [Int(f'x_{i}') if i in self.rf.rfc.nominal_features
+                     else Real(f'x_{i}') for i in range(self.__n_features)]
+        # create bool variables to represent MUC
         props = [Bool(f'p_{i}') for i in range(self.__n_features)]
+        # create label variable
         pred = Int('y')
+        # solve
         s = Solver()
         s.set(':core.minimize', True)
         s.add(self.rf.cnf(variables, pred),
               *_implies(props, _eq_bound(variables, X, tau)),
               pred != y)
         s.check(props)
+        # return a set of feature indices
         return set([int(f'{co}'.split('_')[-1]) for co in s.unsat_core()])
 
     def predict(self, x: Sequence) -> int:

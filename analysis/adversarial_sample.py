@@ -119,16 +119,14 @@ class AdversarialSample:
 
     def __get_region(self, X, y):
         """Alg 3, lines 1-5, get adversarial region."""
-        '''tau = [0 for _ in self.F]
+        tau = [0 for _ in self.F]
         muc = self.muc.muc(X, y, tau)
         unvisited = self.F
         while muc:
             for f in muc:
                 tau[f] += self.kappa[f]
                 unvisited -= {f}
-            muc = self.muc.muc(X, y, tau)'''
-        tau = [0.000, 59.693, 0.000, 1.939, 6.794, 15.691, 0.047, 0.000]
-        unvisited = {0, 2, 7}
+            muc = self.muc.muc(X, y, tau)
         tau = np.array(tau)
         return tau, unvisited
 

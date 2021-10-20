@@ -53,12 +53,15 @@ class DT:
                 if 'threshold' in d:
                     self.children_left[number], value1 = dfs(d['left'], number)
                     self.children_right[number], value2 = dfs(d['right'], number)
+                    self.threshold[number] = d['threshold']
                 else:
                     self.children_left[number], value1 = dfs(d['right'], number)
                     self.children_right[number], value2 = dfs(d['left'], number)
+                    self.threshold[number] = [
+                        i for i, v in enumerate(d['partition']) if v is True
+                    ]
                 value = value1 + value2
                 self.ig[number] = d['weight']
-                self.threshold[number] = d['threshold'] if 'threshold' in d else d['partition']
             rule.pop()
             self.value[number] = value
             return number, value
@@ -69,10 +72,17 @@ class DT:
         node = 0
         while self.children_left[node] != -1:
             f = self.feature[node]
-            if x[f] <= self.threshold[node]:
-                node = self.children_left[node]
+            t = self.threshold[node]
+            if isinstance(t, list):
+                if x[f] in t:
+                    node = self.children_left[node]
+                else:
+                    node = self.children_right[node]
             else:
-                node = self.children_right[node]
+                if x[f] <= t:
+                    node = self.children_left[node]
+                else:
+                    node = self.children_right[node]
         return self.value[node]
 
     def __getitem__(self, item: int) -> List[int]:
@@ -107,16 +117,16 @@ class RFC:
             label_column = len(metadata['features']) - 1
         label = metadata['features'][label_column]['feature-name']
 
-        # for nominal feature method 'satisfy'
+        # nominal feature indices
         dic = {f['name']: f for f in metadata['attributes']}
         self.nominal_features = []
+        i = 0
         for f in metadata['features']:
             if f['attribute-name'] == label:
                 continue
             if 'values' in dic[f['attribute-name']]:
-                self.nominal_features.append(dic[f['attribute-name']]['values'])
-            else:
-                self.nominal_features.append(None)
+                self.nominal_features.append(i)
+            i += 1
 
         # features are ordered according to metadata
         features = [a['feature-name'] for a in metadata['features']]
