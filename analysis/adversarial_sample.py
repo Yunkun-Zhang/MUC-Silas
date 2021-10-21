@@ -119,6 +119,7 @@ class AdversarialSample:
 
     def __get_region(self, X, y):
         """Alg 3, lines 1-5, get adversarial region."""
+        # TODO: how to deal with nominal features?
         tau = [0 for _ in self.F]
         muc = self.muc.muc(X, y, tau)
         unvisited = self.F
@@ -158,11 +159,7 @@ class AdversarialSample:
         if self.verbose:
             print(f'Before opt:         {X + theta_0}')
             print(f'Distance:           {np.linalg.norm(theta_0)}')
-            from tqdm import trange
-            iterator = trange(num_itr, desc='Iterate by gradient')
-        else:
-            iterator = range(num_itr)
-        for _ in iterator:
+        for _ in range(num_itr):
             u = np.random.normal(size=X.size)
             theta_ts = theta_t + u * mu * beta
             gs = self.fine_grained_and_binary_search(X, y, theta_ts, unvisited)

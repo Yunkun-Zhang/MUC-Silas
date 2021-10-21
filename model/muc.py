@@ -46,8 +46,7 @@ def _implies(p, x):
 
 class Tree:
     def __init__(self, dt: DT) -> None:
-        """Build CNF from a decision tree with only numeric features."""
-        # TODO: Deal with nominal features.
+        """Build CNF from a decision tree."""
         self.dt = dt
 
     def cnf(self, x: List[ArithRef], out: List[ArithRef]) -> BoolRef:
