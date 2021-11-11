@@ -74,7 +74,7 @@ class DT:
             f = self.feature[node]
             t = self.threshold[node]
             if isinstance(t, list):
-                if x[f] in t:
+                if int(x[f]) in t:
                     node = self.children_left[node]
                 else:
                     node = self.children_right[node]
@@ -128,6 +128,25 @@ class RFC:
                 self.nominal_features.append(i)
             i += 1
 
+        # converted nominal features (binary) indices
+        self.binary = dict()
+        temp = []
+        name = metadata['attributes'][0]['name'].split('_')
+        name = '_'.join(name[:-1] if name[-1].isdigit() else name)
+        for i, attr in enumerate(metadata['attributes']):
+            new_name = attr['name'].split('_')
+            if name != '' and '_'.join(new_name[:-1]) == name:
+                temp.append(i)
+            else:
+                if temp:
+                    self.binary[name] = temp[:]
+                    temp = []
+                name = '_'.join(new_name[:-1] if new_name[-1].isdigit() else new_name)
+                if new_name[-1].isdigit():
+                    temp.append(i)
+        if temp:
+            self.binary[name] = temp[:]
+
         # features are ordered according to metadata
         features = [a['feature-name'] for a in metadata['features']]
         label_column = features.index(label)
@@ -143,18 +162,11 @@ class RFC:
         self.n_features_ = len(self.features_)
         self.n_outputs_ = 1
         self.trees_ = []
-        self.trees_oob_scores = []
 
-        self._set_oob_scores(summary['trees'])  # read tree oob scores
         self._build_trees(summary['trees'])  # build decision trees
 
     def __getitem__(self, item: int) -> DT:
         return self.trees_[item]
-
-    def _set_oob_scores(self, trees_dic):
-        for tree in trees_dic:
-            # in Silas v0.8.7 tree weight is oob score
-            self.trees_oob_scores.append(tree['weight'])
 
     def _build_trees(self, trees_dic):
         for tree in trees_dic:

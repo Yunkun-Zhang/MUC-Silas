@@ -1,3 +1,5 @@
+import time
+import os
 import random
 import math
 import json
@@ -51,6 +53,9 @@ class Shapley:
           result: A dictionary with feature index as
                   key and Shapley value as item.
         """
+        if self.verbose:
+            print(f'Computing M-Shapley values for class {c}.', end=' ')
+        start = time.time()
         result = dict()
         len_f = len(self.F)
         for i in self.F:
@@ -60,6 +65,8 @@ class Shapley:
                 gain = self.__omega(s | {i}, c) - self.__omega(s, c)
                 phi += gain / math.comb(len_f, len_s) / (len_f - len_s)
             result[i] = phi
+        if self.verbose:
+            print(f'({time.time() - start:.3f}s)')
         return result
 
     def __omega(self, subset, c):
@@ -82,15 +89,17 @@ class Shapley:
 
     def compute_muc(self, X, y, save_file=''):
         """Compute MUCs and save to file."""
-        try:
+        if os.path.exists(save_file):
             with open(save_file, 'r') as f:
                 self.cache = json.load(f)
             if self.verbose:
                 print(f'MUCs loaded from {save_file}.')
-        except FileNotFoundError:
+        else:
             if self.verbose:
                 print('Computing MUCs. This may take a while.')
-            res = _parallel(_compute_muc, list(zip(X, y)), muc=self.muc)
+            s = time.time()
+            res = _parallel(_compute_muc, list(zip(X, y)),
+                            processes=8, muc=self.muc)
             for i, muc in enumerate(res):
                 self.cache[i] = {
                     'muc': list(muc),
@@ -100,4 +109,4 @@ class Shapley:
                 with open(save_file, 'w') as f:
                     json.dump(self.cache, f)
                 if self.verbose:
-                    print(f'MUCs saved to {save_file}.')
+                    print(f'MUCs saved to {save_file}. ({time.time() - s:.3f}s)')

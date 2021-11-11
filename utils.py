@@ -6,6 +6,40 @@ from functools import partial
 from typing import Tuple, List
 
 
+def nominal_to_binary(csv, save_file):
+    """Convert nominal features into one-hot encoding."""
+    df = pd.read_csv(csv)
+    columns = list(df.columns)
+    data = df.values.tolist()
+
+    try:
+        with open(f'clean-metadata.json') as f:
+            metadata = json.load(f)
+    except FileNotFoundError:
+        with open(f'metadata.json') as f:
+            metadata = json.load(f)
+
+    s = 0
+    new_columns = []
+    for i, col in enumerate(columns[:-1]):
+        attr = metadata['attributes'][i + s].copy()
+        if attr['type'] == 'nominal':
+            values = attr['values'].copy()
+            for j, x in enumerate(data):
+                ind = values.index(str(x[i + s]))
+                data[j].pop(i + s)
+                for k in range(len(values)):
+                    data[j].insert(i + s + k, 0)
+                data[j][i + s + ind] = 1
+            s += len(values) - 1
+        else:
+            new_columns.append(col)
+    new_columns.append(columns[-1])
+
+    df = pd.DataFrame(data, columns=new_columns)
+    df.to_csv(save_file, index=False)
+
+
 def load_data(model_path: str, test_file: str) -> Tuple[List[List], List, int]:
     """Load test data from file. Change nominal features (str) into indices (int).
 

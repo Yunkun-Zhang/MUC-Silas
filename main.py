@@ -24,11 +24,11 @@ if __name__ == '__main__':
     # M-Shapley values
     if args['S']:
         print('========== M-Shapley ==========')
-        shapley = Shapley(muc)
+        shapley = Shapley(muc, verbose=True)
         if not os.path.exists('muc_save'):
             os.mkdir('muc_save')
-        save_file = f'muc_save/{model_path.split("/")[-1]}.json'
-        shapley.compute_muc(X_test, y_test, save_file)
+        save_file = f'muc_save/{model_path.split("/")[-1]}_0.json'
+        shapley.compute_muc(X_test[:100], y_test[:100], save_file)
         res = dict()
         for c in range(rfc.n_classes_):
             res[c] = shapley.value(c, args['M'])
@@ -40,12 +40,13 @@ if __name__ == '__main__':
     # Adversarial sample
     if args['A']:
         print('========== Adversarial Sample ==========')
+        print('WARNING: nominal features should be one-hot encoded.')
         x, y = X_test[0], y_test[0]
         print('Generating for x:  ', x)
         print('Original class:    ', muc.predict(x))
-        adv = AdversarialSample(muc, verbose=False)
+        adv = AdversarialSample(muc, verbose=True)
         opt_sample = adv.opt_adv_sample(
-            x, y, num_samples=50000, num_itr=100
+            x, y, num_samples=100000, num_itr=100
         )
         print('Opt sample:        ', opt_sample)
         print('Distance:          ', adv.distance(x, opt_sample))
