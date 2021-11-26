@@ -2,6 +2,8 @@ from z3 import *
 from model.silas import DT, RFC
 from typing import List, Set, Sequence, Dict
 
+set_option(rational_to_decimal=True)
+
 
 def _abs(x):
     """Return the absolute value of x."""
@@ -98,6 +100,7 @@ class MUC:
         self.__n_features = rfc.n_features_
         # forest output placeholder
         self.output = None
+        self.solution = None
 
     def muc(self, X: Sequence, y: int, tau: Sequence[float] = None,
             nominal: Dict = None) -> Set[int]:
@@ -130,7 +133,9 @@ class MUC:
         s.set(':core.minimize', True)
         s.add(*_implies(props, _eq_bound(variables, X, tau, nominal)),
               self.output != y)
-        s.check(props)
+        if s.check(props) == sat:
+            model = s.model()
+            self.solution = [float(f'{model[var]}'.replace('?', '')) for var in variables]
         # return a set of feature indices
         return set([int(f'{co}'.split('_')[-1]) for co in s.unsat_core()])
 

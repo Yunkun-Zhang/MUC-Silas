@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from model.muc import MUC
+from model import MUC
 from typing import Sequence
 
 np.set_printoptions(formatter={'float': '{:.3f}'.format})
@@ -65,11 +65,12 @@ class AdversarialSample:
         theta[unvisited] = 0
         theta = theta / norm
         v_in = v_out = norm
-        # lines 3-5
         # TODO: how to deal with input with same class?
+        #  May occur when doing gradient descent.
         while self.muc.predict(self.__org2adv(x_org, theta, v_out, norm)) == y:
             v_in = v_out
             v_out = v_in / (1 - alpha)
+        # lines 3-5
         while self.muc.predict(self.__org2adv(x_org, theta, v_in, norm)) != y:
             v_out = v_in
             v_in = v_out * (1 - alpha)
@@ -105,15 +106,18 @@ class AdversarialSample:
         """
         assert len(X) == self.__n_features and isinstance(X[0], (int, float)), \
             f'data instance must be 1D array with size {self.__n_features}'
+        self.muc.solution = None
 
         start_time = time.time()
         tau, unvisited = self.__get_region(X, y)
         t1 = time.time() - start_time
         if self.verbose:
             print(f'Good tau found:     {tau}. ({t1:.3f}s)')
+        X = np.array(X)
+        if np.all(tau == 0):
+            return X
 
         start_time = time.time()
-        X = np.array(X)
         theta_0 = self.__get_theta(X, y, tau, unvisited, num_samples)
         t2 = time.time() - start_time
         if self.verbose:
@@ -129,10 +133,9 @@ class AdversarialSample:
 
     def __get_region(self, X, y):
         """Alg 3, lines 1-5, get adversarial region."""
-        # TODO: how to deal with nominal features?
         tau = [0 for _ in self.F]
         muc = self.muc.muc(X, y, tau)
-        unvisited = self.F
+        unvisited = self.F.copy()
         while muc:
             for f in muc:
                 tau[f] += self.kappa[f]
@@ -145,29 +148,29 @@ class AdversarialSample:
         """Alg 3, lines 6-13, generate samples and get the best one."""
         lamda_min = 2147483647
         theta_0 = np.zeros(X.size)
-        while np.all(theta_0 == 0):
-            samples = np.random.uniform(
-                X - tau, X + tau, size=(num_samples, self.__n_features)
-            )
-            samples = self.__force_one_hot(samples)
-            # loop for theta_0
-            for x in samples:
-                if np.all(x == X):
-                    continue
-                if self.muc.predict(x) != y:
-                    x = np.array(x)
-                    theta = x - X  # adv sample direction
-                    lamda = self.fine_grained_binary_search(
-                        X, y, theta, unvisited
-                    )
-                    if lamda_min > lamda:
-                        lamda_min = lamda
-                        theta_0 = theta
+        samples = np.random.uniform(
+            X - tau, X + tau, size=(num_samples, self.__n_features)
+        )
+        samples = self.__force_one_hot(samples)
+        # loop for theta_0
+        for x in samples:
+            if np.all(x == X):
+                continue
+            if self.muc.predict(x) != y:
+                x = np.array(x)
+                theta = x - X  # adv sample direction
+                lamda = self.fine_grained_binary_search(
+                    X, y, theta, unvisited
+                )
+                if lamda_min > lamda:
+                    lamda_min = lamda
+                    theta_0 = theta
+        if np.all(theta_0 == 0):
+            theta_0 = np.array(self.muc.solution) - X
         return theta_0
 
     def __optimize(self, X, y, theta_0, unvisited, num_itr, beta, eta):
         """Alg 3, lines 14-19, iter to compute opt sample."""
-        # TODO: how is mu generated?
         mu = self.kappa / np.max(self.kappa) * 0.01
         mu[self.binary_list] = 0
         theta_t = theta_0
@@ -187,16 +190,18 @@ class AdversarialSample:
         norm = np.linalg.norm(theta_t)
         theta_t = theta_t / norm
         opt_sample = self.__org2adv(X, theta_t, gt, norm)
+        opt_sample = self.__force_one_hot(opt_sample)
         return opt_sample
 
     def __get_step(self, ratio=0.1):
         """Compute self.kappa from the mean of test data."""
         X = self.muc.rf.rfc.X_test
-        kappa = np.mean(X, axis=0) * ratio
+        kappa = np.abs(np.mean(X, axis=0)) * ratio
         kappa[self.binary_list] = 1
         return kappa
 
     def __org2adv(self, x_org, theta, dist, norm):
+        """Avoid affecting nominal features."""
         x_adv = np.where(self.binary_mask,
                          x_org + theta * norm,
                          x_org + theta * dist)
