@@ -91,3 +91,7 @@ def _parallel(func, iterable, processes=None, **kwargs):
 
 def _compute_muc(data, muc):
     return muc.muc(data[0], data[1])
+
+
+def test_func():
+    print('Hello, World!')
