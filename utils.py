@@ -37,7 +37,6 @@ def nominal_to_binary(csv, save_file):
     new_columns.append(columns[-1])
 
     df = pd.DataFrame(data, columns=new_columns)
-    df.to_csv(save_file, index=False)
 
 
 def load_data(model_path: str, test_file: str) -> Tuple[List[List], List, int]:
