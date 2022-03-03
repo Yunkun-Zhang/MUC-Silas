@@ -1,5 +1,16 @@
 # MUC-Silas
-Implementation of paper *MUC-drive Feature Importance Measurement and Adversarial Analysis for Random Forest* based on [Silas](https://www.depintel.com/) models.
+Implementation of paper [*MUC-drive Feature Importance Measurement and Adversarial Analysis for Random Forest*](https://arxiv.org/abs/2202.12512v1) based on [Silas](https://www.depintel.com/) models. Cite the paper with
+
+```
+@misc{ma2022mucdriven,
+      title={MUC-driven Feature Importance Measurement and Adversarial Analysis for Random Forest}, 
+      author={Shucen Ma and Jianqi Shi and Yanhong Huang and Shengchao Qin and Zhe Hou},
+      year={2022},
+      eprint={2202.12512},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
 
 ## Running
 
