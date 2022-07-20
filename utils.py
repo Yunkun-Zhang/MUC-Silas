@@ -37,9 +37,10 @@ def nominal_to_binary(csv, save_file):
     new_columns.append(columns[-1])
 
     df = pd.DataFrame(data, columns=new_columns)
+    df.to_csv(save_file, index=False)
 
 
-def load_data(model_path: str, test_file: str) -> Tuple[List[List], List, int]:
+def load_data(model_path: str, test_file: str, r: int = 6) -> Tuple[List[List], List, int]:
     """Load test data from file. Change nominal features (str) into indices (int).
 
     Returns:
@@ -59,7 +60,7 @@ def load_data(model_path: str, test_file: str) -> Tuple[List[List], List, int]:
     test_data = test_data.values.tolist()
 
     X_test = [sample[:label_column] + sample[label_column + 1:] for sample in test_data]
-    y_test = [classes.index(str(sample[label_column])) for sample in test_data]
+    y_test = [classes.index(_label_float_to_int(sample[label_column])) for sample in test_data]
 
     # change nominal features
     with open(os.path.join(model_path, 'metadata.json'), 'r') as f:
@@ -73,10 +74,21 @@ def load_data(model_path: str, test_file: str) -> Tuple[List[List], List, int]:
         if 'values' in dic[f['attribute-name']]:
             values = dic[f['attribute-name']]['values']
             for j, x in enumerate(X_test):
-                X_test[j][i] = values.index(str(x[i]))
+                temp = str(round(float(x[i]), r))
+                X_test[j][i] = values.index(temp)
         i += 1
 
     return X_test, y_test, label_column
+
+
+def _label_float_to_int(label):
+    try:
+        label = float(label)
+    except ValueError:
+        pass
+    if isinstance(label, int) or (isinstance(label, float) and label.is_integer()):
+        label = str(int(label))
+    return label
 
 
 def _parallel(func, iterable, processes=None, **kwargs):
