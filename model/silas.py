@@ -9,7 +9,8 @@ __version__ = '0.8.7'
 class DT:
     """Decision tree."""
 
-    def __init__(self):
+    def __init__(self, n_classes_: int = None) -> None:
+        self.n_classes_ = n_classes_
         self.oob_score = 0
         self.count = 0              # number of nodes
         self.feature = []           # feature indices at each node
@@ -48,6 +49,10 @@ class DT:
                     if p != 0:
                         entropy -= p * np.log2(p)
                 self.ig[number] = entropy
+            elif 'value' in d:
+                # one-hot value, entropy=0
+                value = np.zeros(self.n_classes_ or 2)
+                value[d['value']] = 1
             else:
                 self.feature[number] = index[d['featureIndex']]
                 if 'threshold' in d:
@@ -61,7 +66,7 @@ class DT:
                         i for i, v in enumerate(d['partition']) if v is True
                     ]
                 value = value1 + value2
-                self.ig[number] = d['weight']
+                self.ig[number] = d.get('weight') or .1
             rule.pop()
             self.value[number] = value
             return number, value
@@ -172,7 +177,7 @@ class RFC:
         for tree in trees_dic:
             with open(os.path.join(self.model_path, tree['path']), 'r') as f:
                 d = json.load(f)
-            dt = DT()
+            dt = DT(self.n_classes_)
             dt.initialize(tree['weight'], d, self.feature_indices)
             self.trees_.append(dt)
 
