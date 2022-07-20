@@ -13,11 +13,12 @@ parser.add_argument('-M', type=int, default=None,
                     help='number of subsets sampled for M-Shapley values')
 parser.add_argument('-S', action='store_true', help='to compute M-Shapley values')
 parser.add_argument('-A', action='store_true', help='to generate adversarial samples')
+parser.add_argument('-r', type=int, help='rounding for float values')
 args = vars(parser.parse_args())
 
 if __name__ == '__main__':
     model_path, test_file = args['model_path'], args['test_file']
-    X_test, y_test, label_column = load_data(model_path, test_file)
+    X_test, y_test, label_column = load_data(model_path, test_file, args['r'])
     rfc = RFC(model_path, X_test, y_test, label_column)
     muc = MUC(rfc)
 
