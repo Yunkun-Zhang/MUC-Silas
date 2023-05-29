@@ -60,7 +60,21 @@ def load_data(model_path: str, test_file: str, r: int = 6) -> Tuple[List[List], 
     test_data = test_data.values.tolist()
 
     X_test = [sample[:label_column] + sample[label_column + 1:] for sample in test_data]
-    y_test = [classes.index(_label_float_to_int(sample[label_column])) for sample in test_data]
+
+    # convert Booean target values to strings.
+    if isinstance(test_data[0][label_column],bool) or str(test_data[0][label_column]) in classes:
+        y_test = [classes.index(str(sample[label_column])) for sample in test_data]
+    # convert target values to integers
+    elif isinstance(test_data[0][label_column], int) or (isinstance(test_data[0][label_column], float) and test_data[0][label_column].is_integer() and str(int(test_data[0][label_column])) in classes):
+        y_test = [classes.index(_label_float_to_int(sample[label_column])) for sample in test_data]
+    # convert target values to floats
+    else:
+        try:
+            y_test = [classes.index(float(sample[label_column])) for sample in test_data]
+        except ValueError:
+                pass
+
+    # y_test = [classes.index(_label_float_to_int(sample[label_column])) for sample in test_data]
 
     # change nominal features
     with open(os.path.join(model_path, 'metadata.json'), 'r') as f:
@@ -72,7 +86,16 @@ def load_data(model_path: str, test_file: str, r: int = 6) -> Tuple[List[List], 
         if f['attribute-name'] == label:
             continue
         if 'values' in dic[f['attribute-name']]:
-            values = dic[f['attribute-name']]['values']
+            values = dic[f['attribute-name']]['values']    
+            skip = False
+            for v in values:
+                if isinstance(v,float) or isinstance(v,int):
+                    continue
+                else:
+                    skip = True
+                    break
+            if skip:
+                continue
             for j, x in enumerate(X_test):
                 temp = str(round(float(x[i]), r))
                 X_test[j][i] = values.index(temp)
